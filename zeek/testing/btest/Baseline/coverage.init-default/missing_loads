@@ -1,0 +1,10 @@
+-./frameworks/cluster/nodes/logger.zeek
+-./frameworks/cluster/nodes/manager.zeek
+-./frameworks/cluster/nodes/proxy.zeek
+-./frameworks/cluster/nodes/worker.zeek
+-./frameworks/cluster/setup-connections.zeek
+-./frameworks/intel/cluster.zeek
+-./frameworks/netcontrol/cluster.zeek
+-./frameworks/openflow/cluster.zeek
+-./frameworks/packet-filter/cluster.zeek
+-./frameworks/sumstats/cluster.zeek

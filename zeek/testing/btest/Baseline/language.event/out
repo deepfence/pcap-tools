@@ -1,0 +1,7 @@
+event statement
+event part1
+event part2
+assign event variable (6)
+schedule statement in zeek_init
+schedule statement in global
+schedule statement another in zeek_init

@@ -1,0 +1,16 @@
+{
+[a=1, b=<uninitialized>],
+[a=3, b=<uninitialized>],
+[a=4, b=5]
+}
+
+[a=1, b=<uninitialized>]
+[a=3, b=<uninitialized>]
+[a=4, b=5]
+
+T
+F
+
+T
+F
+T

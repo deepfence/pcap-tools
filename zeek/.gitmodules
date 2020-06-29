@@ -1,0 +1,42 @@
+[submodule "auxil/zeek-aux"]
+	path = auxil/zeek-aux
+	url = https://github.com/zeek/zeek-aux
+[submodule "auxil/binpac"]
+	path = auxil/binpac
+	url = https://github.com/zeek/binpac
+[submodule "auxil/zeekctl"]
+	path = auxil/zeekctl
+	url = https://github.com/zeek/zeekctl
+[submodule "auxil/btest"]
+	path = auxil/btest
+	url = https://github.com/zeek/btest
+[submodule "cmake"]
+	path = cmake
+	url = https://github.com/zeek/cmake
+[submodule "src/3rdparty"]
+	path = src/3rdparty
+	url = https://github.com/zeek/zeek-3rdparty
+[submodule "auxil/broker"]
+	path = auxil/broker
+	url = https://github.com/zeek/broker
+[submodule "auxil/netcontrol-connectors"]
+	path = auxil/netcontrol-connectors
+	url = https://github.com/zeek/zeek-netcontrol
+[submodule "auxil/bifcl"]
+	path = auxil/bifcl
+	url = https://github.com/zeek/bifcl
+[submodule "doc"]
+	path = doc
+	url = https://github.com/zeek/zeek-docs
+[submodule "auxil/paraglob"]
+	path = auxil/paraglob
+	url = https://github.com/zeek/paraglob
+[submodule "auxil/rapidjson"]
+	path = auxil/rapidjson
+	url = https://github.com/zeek/rapidjson
+[submodule "auxil/libkqueue"]
+	path = auxil/libkqueue
+	url = https://github.com/zeek/libkqueue
+[submodule "auxil/highwayhash"]
+	path = auxil/highwayhash
+	url = https://github.com/zeek/highwayhash

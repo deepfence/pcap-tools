@@ -1,0 +1,23 @@
+#separator \x09
+#set_separator	,
+#empty_field	(empty)
+#unset_field	-
+#path	http-2-2
+#open	2016-07-13-16-15-30
+#fields	status_code
+#types	count
+304
+304
+304
+304
+304
+304
+304
+304
+304
+304
+304
+304
+304
+304
+#close	2016-07-13-16-15-30

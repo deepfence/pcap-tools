@@ -1,0 +1,3 @@
+option changed, testcount, 1, 
+option changed, testport, 44/tcp, 
+option changed, teststring, b, comment

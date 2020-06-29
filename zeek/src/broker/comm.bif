@@ -1,0 +1,139 @@
+
+##! Functions and events regarding broker communication mechanisms.
+
+%%{
+#include "broker/Manager.h"
+%%}
+
+module Broker;
+
+## Generated when something changes in the Broker sub-system.
+event Broker::status%(endpoint: EndpointInfo, msg: string%);
+
+## Generated when a new peering has been established.
+event Broker::peer_added%(endpoint: EndpointInfo, msg: string%);
+
+## Generated when an existing peer has been removed.
+event Broker::peer_removed%(endpoint: EndpointInfo, msg: string%);
+
+## Generated when an existing peering has been lost.
+event Broker::peer_lost%(endpoint: EndpointInfo, msg: string%);
+
+## Generated when an error occurs in the Broker sub-system.
+event Broker::error%(code: ErrorCode, msg: string%);
+
+## Enumerates the possible error types. 
+enum ErrorCode %{
+	UNSPECIFIED = 1,
+	PEER_INCOMPATIBLE = 2,
+	PEER_INVALID = 3,
+	PEER_UNAVAILABLE = 4,
+	PEER_TIMEOUT = 5,
+	MASTER_EXISTS = 6,
+	NO_SUCH_MASTER = 7,
+	NO_SUCH_KEY = 8,
+	REQUEST_TIMEOUT = 9,
+	TYPE_CLASH = 10,
+	INVALID_DATA = 11,
+	BACKEND_FAILURE = 12,
+	STALE_DATA = 13,
+	CAF_ERROR = 100,
+%}
+
+enum PeerStatus %{
+	INITIALIZING,
+	CONNECTING,
+	CONNECTED,
+	PEERED,
+	DISCONNECTED,
+	RECONNECTING,
+%}
+
+function Broker::__listen%(a: string, p: port%): port
+	%{
+	bro_broker::Manager::ScriptScopeGuard ssg;
+
+	if ( ! p->IsTCP() )
+		{
+		builtin_error("listen port must use tcp");
+		return val_mgr->Port(0, TRANSPORT_UNKNOWN);
+		}
+
+	auto rval = broker_mgr->Listen(a->Len() ? a->CheckString() : "", p->Port());
+	return val_mgr->Port(rval, TRANSPORT_TCP);
+	%}
+
+function Broker::__peer%(a: string, p: port, retry: interval%): bool
+	%{
+	bro_broker::Manager::ScriptScopeGuard ssg;
+
+	if ( ! p->IsTCP() )
+		{
+		builtin_error("remote connection port must use tcp");
+		return val_mgr->False();
+		}
+
+	broker_mgr->Peer(a->CheckString(), p->Port(), retry);
+	return val_mgr->True();
+	%}
+
+function Broker::__unpeer%(a: string, p: port%): bool
+	%{
+	bro_broker::Manager::ScriptScopeGuard ssg;
+
+	if ( ! p->IsTCP() )
+		{
+		builtin_error("remote connection port must use tcp");
+		return val_mgr->False();
+		}
+
+	broker_mgr->Unpeer(a->CheckString(), p->Port());
+	return val_mgr->True();
+	%}
+
+function Broker::__peers%(%): PeerInfos
+	%{
+	bro_broker::Manager::ScriptScopeGuard ssg;
+	auto rval = make_intrusive<VectorVal>(zeek::id::find_type<VectorType>("Broker::PeerInfos"));
+	auto i = 0;
+
+	for ( auto& p : broker_mgr->Peers() )
+		{
+		const auto& pi = zeek::id::find_type<RecordType>("Broker::PeerInfo");
+		const auto& ei = zeek::id::find_type<RecordType>("Broker::EndpointInfo");
+		const auto& ni = zeek::id::find_type<RecordType>("Broker::NetworkInfo");
+		auto peer_info = make_intrusive<RecordVal>(pi);
+		auto endpoint_info = make_intrusive<RecordVal>(ei);
+		auto network_info = make_intrusive<RecordVal>(ni);
+		auto n = p.peer.network;
+
+		if ( n )
+			{
+			network_info->Assign(0, make_intrusive<AddrVal>(IPAddr(n->address)));
+			network_info->Assign(1, val_mgr->Port(n->port, TRANSPORT_TCP));
+			}
+		else
+			{
+			network_info->Assign(0, make_intrusive<AddrVal>("0.0.0.0"));
+			network_info->Assign(1, val_mgr->Port(0, TRANSPORT_TCP));
+			}
+
+		endpoint_info->Assign(0, make_intrusive<StringVal>(to_string(p.peer.node)));
+		endpoint_info->Assign(1, std::move(network_info));
+
+		auto ps = (BifEnum::Broker::PeerStatus)p.status;
+		peer_info->Assign(0, std::move(endpoint_info));
+		peer_info->Assign(1, zeek::BifType::Enum::Broker::PeerStatus->GetVal(ps));
+
+		rval->Assign(i, std::move(peer_info));
+		++i;
+		}
+
+	return rval;
+	%}
+
+function Broker::__node_id%(%): string
+	%{
+	bro_broker::Manager::ScriptScopeGuard ssg;
+	return make_intrusive<StringVal>(broker_mgr->NodeID());
+	%}

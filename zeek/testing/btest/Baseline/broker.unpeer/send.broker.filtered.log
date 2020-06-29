@@ -1,0 +1,2 @@
+1590697262.213159 Broker::STATUS peer-added 127.0.0.1 XXX handshake successful
+1590697266.213877 Broker::STATUS peer-removed 127.0.0.1 XXX removed connection to remote peer

@@ -1,0 +1,9 @@
+Input::EVENT_NEW line output (stderr=F): ../mydir:
+Input::EVENT_NEW line output (stderr=F): a
+Input::EVENT_NEW line output (stderr=F): b
+Input::EVENT_NEW line output (stderr=F): c
+Input::EVENT_NEW line output (stderr=T): <stderr output contained nonexistant>
+Input::EVENT_NEW line output (stderr=T): <stderr output contained nonexistant>
+Input::EVENT_NEW line output (stderr=T): <stderr output contained nonexistant>
+End of Data event, input
+Process finished event, input, T

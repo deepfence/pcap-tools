@@ -1,0 +1,13 @@
+Wireshark Tests
+
+The recommended steps to prepare for and to run tests:
+
+* Install two Python packages, pytest: `pip install pytest pytest-xdist`
+* Build programs (“wireshark”, “tshark”, etc.): `ninja`
+* Build additional programs for the “unittests” suite: `ninja test-programs`
+* Run tests in the build directory: `pytest`
+
+Replace `ninja test-programs` by `make test-programs` as needed.
+
+See the “Wireshark Tests” chapter of the Developer's Guide for details:
+https://www.wireshark.org/docs/wsdg_html_chunked/ChapterTests.html
