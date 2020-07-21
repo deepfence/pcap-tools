@@ -1,0 +1,317 @@
+The Data AcQuisition library (DAQ), provides pluggable packet I/O.  LibDAQ
+replaces direct calls to libraries like libpcap with an abstraction layer
+that facilitates operation on a variety of hardware and software interfaces
+without requiring changes to Snort.  It is possible to select the DAQ module
+and mode when invoking Snort to perform pcap readback or inline operation,
+etc.  The DAQ library may be useful for other packet processing
+applications and the modular nature allows you to build new modules for
+other platforms.
+
+The DAQ library exists as a separate repository on the official Snort 3 GitHub
+project (https://github.com/snort3/libdaq) and contains a number of bundled DAQ
+modules including AFPacket, Divert, NFQ, PCAP, and Netmap implementations.
+Snort 3 itself contains a few new DAQ modules mostly used for testing as
+described below.  Additionally, DAQ modules developed by third parties to
+facilitate the usage of their own hardware and software platforms exist.
+
+
+=== Building the DAQ Library and Its Bundled DAQ Modules
+
+Refer to the READMEs in the LibDAQ source tarball for instructions on how to
+build the library and modules as well as details on configuring and using the
+bundled DAQ modules.
+
+
+=== Configuration
+
+As with a number of features in Snort 3, the LibDAQ and DAQ module
+configuration may be controlled using either the command line options or by
+configuring the 'daq' Snort module in the Lua configuration.
+
+DAQ modules may be statically built into Snort, but the more common case is to
+use DAQ modules that have been built as dynamically loadable objects.  Because
+of this, the first thing to take care of is informing Snort of any locations it
+should search for dynamic DAQ modules.  From the command line, this can be done
+with one or more invocations of the --daq-dir option, which takes a
+colon-separated set of paths to search as its argument.  All arguments will be
+collected into a list of locations to be searched. In the Lua configuration, the
+'daq.module_dirs[]' property is a list of paths for the same purpose.
+
+Next, one must select which DAQ modules they wish to use by name.  At least one
+base module and zero or more wrapper modules may be selected.  This is done
+using the --daq options from the command line or the 'daq.modules[]' list-type
+property.  To get a list of the available modules, run Snort with the --daq-list
+option making sure to specify any DAQ module search directories beforehand.  If
+no DAQ module is specified, Snort will default to attempting to find and use a
+DAQ module named 'pcap'.
+
+Some DAQ modules can be further directly configured using DAQ module variables.
+All DAQ module variables come in the form of either just a key or a key and a
+value separated by an equals sign.  For example, 'debug' or 'fanout_type=hash'.
+The command line option for specifying these is --daq-var and the configuration
+file equivalent is the 'daq.modules[].variables[]' property.  The available
+variables for each module will be shown when listing the available DAQ modules
+with --daq-list.
+
+The LibDAQ concept of operational mode (passive, inline, or file readback) is
+automatically configured based on inferring the mode from other Snort
+configuration.  The presence of -r or --pcap-* options implies 'read-file', -i
+without -Q implies 'passive', and -i with -Q implies 'inline'.  The mode can be
+overridden on a per-DAQ module basis with the --daq-mode option on the command
+line or the 'daq.modules[].mode' property.
+
+The DAQ module receive timeout is always configured to 1 second.  The packet
+capture length (snaplen) defaults to 1518 bytes and can be overridden by the -s
+command line option or 'daq.snaplen' property.
+
+Finally, and most importantly, is the input specification for the DAQ module.
+In readback mode, this is simply the file to be read back and analyzed.  For
+live traffic processing, this is the name of the interface or other necessary
+input specification as required by the DAQ module to understand what to operate
+upon.  From the command line, the -r option is used to specify a file to be
+read back and the -i option is used to indicate a live interface input
+specification.  Both are covered by the 'daq.inputs[]' property.
+
+For advanced use cases, one additional LibDAQ configuration exists: the number
+of DAQ messages to request per receive call.  In Snort, this is referred to as
+the DAQ "batch size" and defaults to 64.  The default can be overridden with
+the --daq-batch-size command line option or 'daq.batch_size' property.  The
+message pool size requested from the DAQ module will be four times this batch
+size.
+
+
+==== Command Line Example
+
+    snort --daq-dir /usr/local/lib/daq --daq-dir /opt/lib/daq --daq afpacket
+--daq-var debug --daq-var fanout_type=hash -i eth1:eth2 -Q
+
+
+==== Configuration File Example
+
+The following is the equivalent of the above command line DAQ configuration in
+Lua form:
+
+    daq =
+    {
+        module_dirs =
+        {
+            '/usr/local/lib/daq',
+            '/opt/lib/daq'
+        },
+        modules =
+        {
+            {
+                name = 'afpacket',
+                mode = 'inline',
+                variables =
+                {
+                    'debug',
+                    'fanout_type=hash'
+                }
+            }
+        },
+        inputs =
+        {
+            'eth1:eth2',
+        },
+        snaplen = 1518
+    }
+
+The 'daq.snaplen' property was included for completeness and may be omitted if
+the default value is acceptable.
+
+
+==== DAQ Module Configuration Stacks
+
+Like briefly mentioned above, a DAQ configuration consists of a base DAQ module
+and zero or more wrapper DAQ modules.  DAQ wrapper modules provide additional
+functionality layered on top of the base module in a decorator pattern.  For
+example, the Dump DAQ module will capture all passed or injected packets and
+save them to a PCAP savefile.  This can be layered on top of something like the
+PCAP DAQ module to assess which packets are making it through Snort without
+being dropped and what actions Snort has taken that involved sending new or
+modified packets out onto the network (e.g., TCP reset packets and TCP
+normalizations).
+
+To configure a DAQ module stack from the command line, the --daq option must
+be given multiple times with the base module specified first followed by the
+wrapper modules in the desired order (building up the stack).  Each --daq
+option changes which module is being configured by subsequent --daq-var and
+--daq mode options.
+
+When configuring the same sort of stack in Lua, everything lives in the
+'daq.modules[]' property.  'daq.modules[]' is an array of module configurations
+pushed onto the stack from top to bottom.  Each module configuration *must*
+contain the name of the DAQ module.  Additionally, it may contain an array of
+variables ('daq.modules[].variables[]') and/or an operational mode
+('daq.modules[].mode').
+
+If only wrapper modules were specified, Snort will default to implicitly
+configuring a base module with the name 'pcap' in 'read-file' mode.  This is a
+convenience to mimic the previous behavior when selecting something like the
+old Dump DAQ module that may be removed in the future.
+
+For any particularly complicated setup, it is recommended that one configure
+via a Lua configuration file rather than using the command line options.
+
+
+=== Interaction With Multiple Packet Threads
+
+All packet threads will receive the same DAQ instance configuration with the
+potential exception of the input specification.
+
+If Snort is in file readback mode, a full set of files will be constructed from
+the -r/--pcap-file/--pcap-list/--pcap-dir/--pcap-filter options.  A number of
+packet threads will be started up to the configured maximum (-z) to process
+these files one at a time.  As a packet thread completes processing of a file,
+it will be stopped and then started again with a different file input to
+process.  If the number of packet threads configured exceeds the number of
+files to process, or as the number of remaining input files dwindles below that
+number, Snort will stop spawning new packet threads when it runs out of
+unhandled input files.
+
+When Snort is operating on live interfaces (-i), all packet threads up to the
+configured maximum will always be started.  By default, if only one input
+specification is given, all packet threads will receive the same input in their
+configuration.  If multiple inputs are given, each thread will be given the
+matching input (ordinally), falling back to the first if the number of packet
+threads exceeds the number of inputs.
+
+
+=== DAQ Modules Included With Snort 3
+
+==== Socket Module
+
+The socket module provides provides a stream socket server that will accept
+up to 2 simultaneous connections and bridge them together while also
+passing data to Snort for inspection.  The first connection accepted is
+considered the client and the second connection accepted is considered the
+server.  If there is only one connection, stream data can't be forwarded
+but it is still inspected.
+
+Each read from a socket of up to snaplen bytes is passed as a packet to
+Snort along with the ability to retrieve a DAQ_UsrHdr_t structure via ioctl.
+DAQ_UsrHdr_t conveys IP4 address, ports, protocol, and direction.  Socket
+packets can be configured to be TCP or UDP.  The socket DAQ can be operated
+in inline mode and is able to block packets.
+
+Packets from the socket DAQ module are handled by Snort's stream_user module,
+which must be configured in the Snort configuration.
+
+To use the socket DAQ, start Snort like this:
+
+    ./snort --daq-dir /path/to/lib/snort_extra/daq \
+        --daq socket [--daq-var port=<port>] [--daq-var proto=<proto>] [-Q]
+
+    <port> ::= 1..65535; default is 8000
+    <proto> ::= tcp | udp
+
+* This module only supports ip4 traffic.
+
+* This module is only supported by Snort 3.  It is not compatible with
+  Snort 2.
+
+* This module is primarily for development and test.
+
+
+==== File Module
+
+The file module provides the ability to process files directly without having
+to extract them from pcaps.  Use the file module with Snort's stream_file to
+get file type identification and signature services.  The usual IPS detection
+and logging, etc. is also available.
+
+You can process all the files in a directory recursively using 8 threads
+with these Snort options:
+
+    --pcap-dir path -z 8
+
+* This module is only supported by Snort 3.  It is not compatible with
+  Snort 2.
+
+* This module is primarily for development and test.
+
+
+==== Hext Module
+
+The hext module generates packets suitable for processing by Snort from
+hex/plain text.  Raw packets include full headers and are processed
+normally.  Otherwise the packets contain only payload and are accompanied
+with flow information (4-tuple) suitable for processing by stream_user.
+
+The first character of the line determines it's purpose:
+
+    '$' command
+    '#' comment
+    '"' quoted string packet data
+    'x' hex packet data
+    ' ' empty line separates packets
+
+The available commands are:
+
+    $client <ip4> <port>
+    $server <ip4> <port>
+
+    $packet -> client
+    $packet -> server
+
+    $packet <addr> <port> -> <addr> <port>
+
+    $sof <i32:ingressZone> <i32:egressZone> <i32:ingressIntf> <i32:egressIntf> <s:srcIp> <i16:srcPort> <s:destIp> <i16:dstPort> <u32:opaque> <u64:initiatorPkts> <u64:responderPkts> <u64:initiatorPktsDropped> <u64:responderPktsDropped> <u64:initiatorBytesDropped> <u64:responderBytesDropped> <u8:isQosAppliedOnSrcIntf> <timeval:sof_timestamp> <timeval:eof_timestamp> <u16:vlan> <u16:address_space_id> <u8:protocol>
+    $eof <i32:ingressZone> <i32:egressZone> <i32:ingressIntf> <i32:egressIntf> <s:srcIp> <i16:srcPort> <s:destIp> <i16:dstPort> <u32:opaque> <u64:initiatorPkts> <u64:responderPkts> <u64:initiatorPktsDropped> <u64:responderPktsDropped> <u64:initiatorBytesDropped> <u64:responderBytesDropped> <u8:isQosAppliedOnSrcIntf> <timeval:sof_timestamp> <timeval:eof_timestamp> <u16:vlan> <u16:address_space_id> <u8:protocol>
+
+Client and server are determined as follows.  $packet -> client indicates
+to the client (from server) and $packet -> server indicates a packet to the
+server (from client).  $packet followed by a 4-tuple uses the heuristic
+that the client is the side with the greater port number.
+
+The default client and server are 192.168.1.1 12345 and 10.1.2.3 80
+respectively.  $packet commands with a 4-tuple do not change client and
+server set with the other $packet commands.
+
+$packet commands should be followed by packet data, which may contain any
+combination of hex and strings.  Data for a packet ends with the next
+command or a blank line.  Data after a blank line will start another packet
+with the same tuple as the prior one.
+
+$sof and $eof commands generate Start of Flow and End of Flow metapackets
+respectively. They are followed by a definition of a Flow_Stats_t data structure
+which will be fed into Snort via the metadata callback.
+
+Strings may contain the following escape sequences:
+
+    \r = 0x0D = carriage return
+    \n = 0x0A = new line
+    \t = 0x09 = tab
+    \\ = 0x5C = \
+
+Format your input carefully; there is minimal error checking and little
+tolerance for arbitrary whitespace.  You can use Snort's -L hext option to
+generate hext input from a pcap.
+
+* This module only supports ip4 traffic.
+
+* This module is only supported by Snort 3.  It is not compatible with
+  Snort 2.
+
+* This module is primarily for development and test.
+
+The hext DAQ also supports a raw mode which is activated by setting the
+data link type.  For example, you can input full ethernet packets with
+--daq-var dlt=1 (Data link types are defined in the DAQ include
+sfbpf_dlt.h.)  Combine that with the hext logger in raw mode for a quick
+(and dirty) way to edit pcaps.  With --lua "log_hext = { raw = true }", the
+hext logger will dump the full packet in a way that can be read by the hext
+DAQ in raw mode.  Here is an example:
+
+    # 3 [96]
+
+    x02 09 08 07 06 05 02 01 02 03 04 05 08 00 45 00 00 52 00 03  # ..............E..R..
+    x00 00 40 06 5C 90 0A 01 02 03 0A 09 08 07 BD EC 00 50 00 00  # ..@.\............P..
+    x00 02 00 00 00 02 50 10 20 00 8A E1 00 00 47 45 54 20 2F 74  # ......P.  .....GET /t
+    x72 69 67 67 65 72 2F 31 20 48 54 54 50 2F 31 2E 31 0D 0A 48  # rigger/1 HTTP/1.1..H
+    x6F 73 74 3A 20 6C 6F 63 61 6C 68 6F 73 74 0D 0A              # ost: localhost..
+
+A comment indicating packet number and size precedes each packet dump.
+Note that the commands are not applicable in raw mode and have no effect.
+

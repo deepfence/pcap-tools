@@ -1,0 +1,52 @@
+This inspector is still in experimental (work-in-progress) state.
+
+The Real-time Network Awareness (RNA) inspector provides visibility into a network using
+Passive Network Discovery (PND). RNA analyzes traffic to discover hosts on the network
+and to detect operating system (OS) running on a host. It uses fingerprints for OS detection.
+It logs ip/mac addresses, ports, protocols, OS, and other information about traffic running
+on these hosts. It does not generate or alter traffic on its own.
+
+RNA logs information it discovers by parsing TCP/UDP/IP/Link-layer protocols and observing
+data found by other inspectors (e.g., monitoring application IDs, client versions,
+user-agents found by appid or http inspectors). Operating systems have different signatures
+which are apparent in different parameters in the packets that it sends. These parameters
+include things like TCP window sizes, TCP options, segment sizes, etc. Such fingerprinting
+information is provided to RNA as input so that RNA can analyze traffic.
+
+RNA discoveries is stored in host tracker objects, which are saved globally in an LRU cache
+and shared among threads. RNA memory and discovery are bounded by the memcap of cache.
+
+Packets from untracked sessions (e.g., non-IP) are processed via the eval method as per
+proto-bit registrations. Packets from tracked sessions (e.g., IP, TCP, UDP, and ICMP)
+are processed via events as per subscriptions. Since RNA needs to see the first packet
+of a session published from stream trackers, these modules (e.g., stream, stream_icmp,
+stream_ip, stream_tcp, and stream_udp) should be enabled whenever RNA module is enabled.
+
+Currently, RNA only supports host discovery with filtering based on IP/port/zone. To enable
+this (disabled by default), the config file referred by rna_conf_path can have keywords:
+Analyze            # discover application, host, user (only host discovery is implemented)
+AnalyzeHostUser    # discover application, host, user (same as Analyze)
+AnalyzeApplication # discover application
+AnalyzeHost        # discover application, host
+AnalyzeUser        # discover application, user
+portexclusion      # don't discover on this port
+
+Format:
+config keyword [!]ip [zone]
+portexclusion dst|src|both tcp|udp port ip
+
+Examples:
+config AnalyzeHost 0.0.0.0/0 -1     # discover any ipv4 on any zone
+config AnalyzeHost ::/0 2           # discover any ipv6 on zone 2
+config AnalyzeHost !1.2.3.4/16 3    # exclude this ipv4 range on zone 3
+config Analyze !cafe:feed::0/64     # exclude this ipv6 range on any zone
+portexclusion dst udp 53 8.8.8.8    # exclude this ip for UDP port 53 in destination direction
+portexclusion both tcp 4000 ::0/0   # exclude any ipv6 for TCP port 4000 in both direction
+
+Note that exclusion has higher priority than inclusion. RNA does not support application/user
+discovery, fingerprint, fingerprint reader, enable_banner_grab, etc. The enable_logger config
+is to enable/disable sending RNA discovery events to EventManager::call_loggers. Such event logger
+or reader is not implemented yet. However, since RNA stores host information into host_cache,
+to log the discovered hosts into a file, one can
+    1) issue socket command: host_cache.dump('file.out'), or
+    2) add lua config: host_cache = { dump_file = 'file.out'}.
